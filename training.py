@@ -6,20 +6,15 @@ import glob
 import tqdm
 import lda
 
-# Load words
-words = []
-with open("words.lex", "rt") as lex_file:
-    for line in lex_file.readlines():
-        word = line.split("\t")[-1]
-        words.append(word)
-print("Lexicon loaded")
 # Load data
 print("Starting training...")
-lda = LatentDirichletAllocation(total_samples = 3130377, n_jobs=-1, verbose=10, n_components=15, random_state=0, learning_method="online", max_iter=5, learning_offset=50)
-#lda = lda.LDA(n_topics = 15, n_iter=150, random_state=0)
+#lda = LatentDirichletAllocation(total_samples = 3130377, n_jobs=-1, verbose=10, n_components=15, random_state=0, learning_method="online", max_iter=5, learning_offset=50)
+lda = lda.LDA(n_topics = 15, n_iter=150, random_state=0)
 row, col, data = np.array(()), np.array(()), np.array(())
 
-for doc in tqdm.tqdm(glob.glob("ECJ_doc/matrix_data_*.p")[:100]):
+matrix_data_list = glob.glob("ECJ_doc/matrix_data_*.p")
+np.random.shuffle(matrix_data_list)
+for doc in tqdm.tqdm(matrix_data_list[:2]):
     res = pickle.load(open(doc, "rb"))
     row = np.append(row, np.int32(res["I"]))
     col = np.append(col, np.int32(res["J"]))
