@@ -14,24 +14,30 @@ print("Starting training...")
 lda = lda.LDA(n_topics = 5, n_iter=150, random_state=0)
 row, col, data = np.array(()), np.array(()), np.array(())
 
-matrix_data_list = glob.glob("ECJ_doc_stop/matrix_data_*.p")
+matrix_data_list = ["ECJ_doc_stop/matrix_data_514.p"] #, "ECJ_doc_stop/matrix_data_199.p"]#glob.glob("ECJ_doc_stop/matrix_data_*.p")
 np.random.shuffle(matrix_data_list)
-for doc in tqdm.tqdm(matrix_data_list[:2]):
+for doc in tqdm.tqdm(matrix_data_list[:1]):
     print("Partial fitting", doc)
     res = pickle.load(open(doc, "rb"))
     row = np.append(row, np.int32(res["I"]))
     col = np.append(col, np.int32(res["J"]))
     data = np.append(data, np.int32(res["data"]))
-X = coo_matrix((np.int32(data), (np.int32(row), np.int32(col))))
+
+#print("BS", 644928 in col)
+X = coo_matrix((np.int32(1000*data), (np.int32(row), np.int32(col))))
+print(X.tocsr()[:, 644928].todense().any())
+#exit(0)
 #lda.partial_fit(X)
 lda.fit(X)
 #    break
-
+print(lda.components_.shape)
+print(lda.components_)
 print("Training done")
 def print_top_words(model, n_top_words):
     for topic_idx, topic in enumerate(model.components_):
         message = "Topic #%d: " % topic_idx
-        message += " ".join([str(i)
+        print(topic)
+        message += " ".join([str(words[i])
                              for i in topic.argsort()[:-n_top_words - 1:-1]])
         print(message)
 
