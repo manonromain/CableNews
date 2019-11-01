@@ -44,8 +44,11 @@ def main(index_dir, silent, context_size, doc_id):
     stop_words = [words.index(w) for w in stop_words_custom if w in words]
     print("Stop words", STOP_WORDS)
     bs_words = [words.index(w) for w in ["gotdepence"] if w in words]
+    doc_idxs = np.random.choice(246923, 100)
+    word_idx_dic = {}
+    idx_counter = 0
     with CaptionIndex(idx_path, lexicon, documents) as index:
-        for doc_id in tqdm.tqdm(range(246923)):
+        for doc_id in doc_idxs:
             dic = {}
             count = 1
             postings = index.intervals(doc_id)
@@ -57,11 +60,17 @@ def main(index_dir, silent, context_size, doc_id):
                 tokens = index.tokens(0, p.idx, p.len)
                 for token in tokens:
                     if token not in stop_words and token not in bs_words:
+                        if token in word_idx_dic.keys():
+                            token = word_idx_dic[token]
+                        else:
+                            word_idx_dic[token] = idx_counter
+                            idx_counter += 1
+                        
                         if token in dic:
                             dic[token] += 1
                         else:
                             dic[token] = 1
-
+    pickle.dump(word_idx_dic, open("word_idx.p", "wb"))
 
 if __name__ == '__main__':
     main(**vars(get_args()))
