@@ -69,20 +69,20 @@ def main(index_dir, silent, context_size, doc_id):
                 tokens = index.tokens(0, p.idx, p.len)
                 if not tokens:
                     continue
-                token = tokens[0]
-                word = ''.join([words[token] for token in tokens])
-                # stemmed_word = stemmer.stem(word)
-                stemmed_word = stemmer.lemmatize(word)
-                # print("Word {} -> {}".format(word, stemmed_word))
-                if word not in stop_words and stemmed_word not in stop_words and len(word)>1:
-                    if stemmed_word not in word_idx_dic.keys():
-                        word_idx_dic[stemmed_word] = idx_counter
-                        idx_counter += 1
-                    idx_token = word_idx_dic[stemmed_word]
-                    if idx_token in dic:
-                        dic[idx_token] += 1
-                    else:
-                        dic[idx_token] = 1
+                for token in tokens:
+                    word = words[token]
+                    # stemmed_word = stemmer.stem(word)
+                    if word not in stop_words and len(word)>1:
+                        stemmed_word = stemmer.lemmatize(word)
+                        # print("Word {} -> {}".format(word, stemmed_word))
+                        if stemmed_word not in word_idx_dic.keys():
+                            word_idx_dic[stemmed_word] = idx_counter
+                            idx_counter += 1
+                        idx_token = word_idx_dic[stemmed_word]
+                        if idx_token in dic:
+                            dic[idx_token] += 1
+                        else:
+                            dic[idx_token] = 1
     print(word_idx_dic)
     pickle.dump(word_idx_dic, open("word_idx.p", "wb"))
 
