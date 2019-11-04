@@ -1,0 +1,7 @@
+index.bin
+words.lex
+docs.list
+ECJ_doc*
+*.p
+__pycache__
+nohup.out

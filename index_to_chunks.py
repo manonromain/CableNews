@@ -8,6 +8,10 @@ import pickle
 import tqdm
 import spacy
 from spacy.lang.en.stop_words import STOP_WORDS
+import nltk
+
+from nltk.stem.porter import PorterStemmer
+from nltk.stem import WordNetLemmatizer 
 
 from utils import get_lexicon
 from captions import Lexicon, Documents, CaptionIndex
@@ -40,36 +44,46 @@ def main(index_dir, silent, context_size, doc_id):
     lexicon = Lexicon.load(lex_path)
 
     words = get_lexicon()
-    stop_words_custom = set(list(STOP_WORDS) + [".", ",", ">>", ":", ";"])
-    stop_words = [words.index(w) for w in stop_words_custom if w in words]
-    print("Stop words", STOP_WORDS)
-    bs_words = [words.index(w) for w in ["gotdepence"] if w in words]
-    doc_idxs = np.random.choice(246923, 100)
+    stop_words = set(list(STOP_WORDS) + ["know", "think", "thing", "don’t", "like", "got", "people", "going", "talk", "right", "happened", ">>"])
+    print("Stop words", stop_words)
+    bs_words = ["gotn"]
+    doc_idxs = np.random.choice(246923, 1500)
     word_idx_dic = {}
     idx_counter = 0
+
+    # Create stemmer
+    # stemmer = PorterStemmer()
+    stemmer = WordNetLemmatizer() 
     with CaptionIndex(idx_path, lexicon, documents) as index:
-        for doc_id in doc_idxs:
+        for doc_id in tqdm.tqdm(doc_idxs):
             dic = {}
             count = 1
-            postings = index.intervals(doc_id)
+            postings = index.intervals(int(doc_id))
             for p in postings:
+                # Cut after 5 minutes
                 if p.end > 300*count:
-                    pickle.dump(dic, open('ECJ_doc_stop/Doc_%d_Chunk_%d.p'%(doc_id, count-1),'wb'))
+                    pickle.dump(dic, open('ECJ_doc_manon/Doc_%d_Chunk_%d.p'%(doc_id, count-1),'wb'))
                     dic = {}
                     count += 1
+                # Get first word in postings, rest is 's or 'll 
                 tokens = index.tokens(0, p.idx, p.len)
-                for token in tokens:
-                    if token not in stop_words and token not in bs_words:
-                        if token in word_idx_dic.keys():
-                            token = word_idx_dic[token]
-                        else:
-                            word_idx_dic[token] = idx_counter
-                            idx_counter += 1
-                        
-                        if token in dic:
-                            dic[token] += 1
-                        else:
-                            dic[token] = 1
+                if not tokens:
+                    continue
+                token = tokens[0]
+                word = ''.join([words[token] for token in tokens])
+                # stemmed_word = stemmer.stem(word)
+                stemmed_word = stemmer.lemmatize(word)
+                # print("Word {} -> {}".format(word, stemmed_word))
+                if word not in stop_words and stemmed_word not in stop_words and len(word)>1:
+                    if stemmed_word not in word_idx_dic.keys():
+                        word_idx_dic[stemmed_word] = idx_counter
+                        idx_counter += 1
+                    idx_token = word_idx_dic[stemmed_word]
+                    if idx_token in dic:
+                        dic[idx_token] += 1
+                    else:
+                        dic[idx_token] = 1
+    print(word_idx_dic)
     pickle.dump(word_idx_dic, open("word_idx.p", "wb"))
 
 if __name__ == '__main__':
