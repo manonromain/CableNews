@@ -17,7 +17,11 @@ from utils import get_lexicon
 from captions import Lexicon, Documents, CaptionIndex
 from captions.query import Query
 from captions.util import PostingUtil
+
+from test_face_gender import gender_to_time
 DEFAULT_CONTEXT = 3
+
+gender_reqs = {"msup":20, "fsup":0, "finf":0, "minf":1}
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -29,13 +33,14 @@ def get_args():
                         default=DEFAULT_CONTEXT,
                         help='Context window width (default: {})'.format(
                              DEFAULT_CONTEXT))
-    parser.add_argument('-i', dest='doc_id', type=int, help='doc_ic')
+    parser.add_argument('-f', dest='folder', help='where to save')
+    parser.add_argument('--use_gender', action='store_true')
 
     return parser.parse_args()
 
 
 
-def main(index_dir, silent, context_size, doc_id):
+def main(index_dir, silent, context_size, folder, use_gender):
     doc_path = os.path.join(index_dir, 'docs.list')
     lex_path = os.path.join(index_dir, 'words.lex')
     idx_path = os.path.join(index_dir, 'index.bin')
@@ -44,28 +49,44 @@ def main(index_dir, silent, context_size, doc_id):
     lexicon = Lexicon.load(lex_path)
 
     words = get_lexicon()
-    stop_words = set(list(STOP_WORDS) + ["know", "think", "thing", "don’t", "like", "got", "people", "going", "talk", "right", "happened", ">>"])
+    stop_words = set(list(STOP_WORDS) + ["know", "don", "ve", "say", "way", "said", "ll", "think", "thing", "don’t", "like", "got", "people", "going", "talk", "right", "happened", ">>"])
     print("Stop words", stop_words)
-    bs_words = ["gotn"]
-    doc_idxs = np.random.choice(246923, 1500)
+    
+    doc_idxs = np.random.choice(246923, 2500)
     word_idx_dic = {}
     idx_counter = 0
 
+    # Create folder
+    if not os.path.exists(folder):
+        os.makedirs(folder)
     # Create stemmer
-    # stemmer = PorterStemmer()
     stemmer = WordNetLemmatizer() 
     with CaptionIndex(idx_path, lexicon, documents) as index:
         for doc_id in tqdm.tqdm(doc_idxs):
             dic = {}
             count = 1
-            postings = index.intervals(int(doc_id))
+            if use_gender:
+                intervals_gender = gender_to_time(str(doc_id), gender_reqs)
+                postings = []
+                for t1, t2 in intervals_gender:
+                    postings.extend(index.intervals(int(doc_id), t1, t2))
+            else:
+                postings = index.intervals(int(doc_id))
+            
+            starttime = None
+
             for p in postings:
-                # Cut after 5 minutes
-                if p.end > 300*count:
-                    pickle.dump(dic, open('ECJ_doc_manon/Doc_%d_Chunk_%d.p'%(doc_id, count-1),'wb'))
+                if starttime is None:
+                    starttime = p.start
+
+                # Cut after 30s
+                if p.end - starttime > 30*count:
+                    pickle.dump(dic, open(os.path.join(folder, 'Doc_%d_Chunk_%d.p'%(doc_id, count-1)),'wb'))
                     dic = {}
                     count += 1
-                # Get first word in postings, rest is 's or 'll 
+                    starttime = p.end
+
+                # Get words in posting
                 tokens = index.tokens(0, p.idx, p.len)
                 if not tokens:
                     continue
@@ -83,8 +104,7 @@ def main(index_dir, silent, context_size, doc_id):
                             dic[idx_token] += 1
                         else:
                             dic[idx_token] = 1
-    print(word_idx_dic)
-    pickle.dump(word_idx_dic, open("word_idx.p", "wb"))
+    pickle.dump(word_idx_dic, open(os.path.join(folder, "word_idx.p"), "wb"))
 
 if __name__ == '__main__':
     main(**vars(get_args()))

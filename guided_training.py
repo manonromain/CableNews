@@ -9,42 +9,39 @@ import os
 from utils import get_lexicon
 from nltk.stem import WordNetLemmatizer 
 from termcolor import colored
-
-MODEL = "lda" #"sklearn_batch"
+from seed_topics import seed_topics
+import guidedlda
 
 word2idx = pickle.load(open("ECJ_gendered/word_idx.p", "rb"))
+print(word2idx)
+# Load seed topics
+seed_topics, topics = seed_topics(word2idx)
+
 idx_to_word = {v: k for k, v in word2idx.items()}
 # Load data
 print("Starting training...")
-if MODEL  == "sklearn":
-    lda = LatentDirichletAllocation(total_samples=246913, n_jobs=4, verbose=1, n_components=15, random_state=1, learning_method="online", max_iter=100, learning_offset=50)
-elif MODEL == "lda":
-    lda = lda.LDA(n_topics = 20, n_iter=200, random_state=1)
-else:
-    lda = LatentDirichletAllocation(n_jobs=4, verbose=1, n_components=15, random_state=1, learning_method="batch", max_iter=100)
+lda = guidedlda.GuidedLDA(n_topics=len(topics), n_iter=100, random_state=7, refresh=20)
+
+
+## Concat data
 row, col, data = np.array(()), np.array(()), np.array(())
 
 matrix_data_list = glob.glob("ECJ_gendered/matrix_data_*.p")
 np.random.shuffle(matrix_data_list)
 for doc in tqdm.tqdm(matrix_data_list):
-    if MODEL == "sklearn":
-        row, col, data = np.array(()), np.array(()), np.array(())
     print("Partial fitting", doc)
     res = pickle.load(open(doc, "rb"))
     row = np.append(row, np.int32(res["I"]))
     col = np.append(col, np.int32(res["J"]))
     data = np.append(data, np.int32(res["data"]))
     X = coo_matrix((np.int32(data), (np.int32(row), np.int32(col))))
-    if MODEL == "sklearn":
-        lda.partial_fit(X)
-if MODEL != "sklearn":
-    lda.fit(X)
-#    break
+    
+lda.fit(X, seed_topics=seed_topics, seed_confidence=0.4)
 
 print("Training done")
 def print_top_words(model, n_top_words):
     for topic_idx, topic in enumerate(model.components_):
-        message = "Topic #%d: " % topic_idx
+        message = "Topic #{} - {}: ".format(topic_idx, topics[topic_idx])
         message += " ".join([idx_to_word[i]
                              for i in topic.argsort()[:-n_top_words - 1:-1]])
         print(message)
@@ -54,19 +51,9 @@ def print_sentence_and_topic(sentence, topic):
     print(colored("Topic:   ", "blue"), colored(topic, "red"))
 
 print_top_words(lda, 20)
-np.save(open("ECJ_doc_30s/{}_components.npy".format(MODEL), "wb"), lda.components_)
+np.save(open("ECJ_gendered/{}_components.npy".format(MODEL), "wb"), lda.components_)
 
-topic_file_name = "ECJ_doc_30s/{}_topics.npy".format(MODEL)
-
-if not os.path.exists(topic_file_name):
-    topics = []
-    for topic_idx, topic in enumerate(lda.components_):
-        name = input("Name of topic {}:".format(topic_idx)) 
-        topics.append(name)
-    np.save(open(topic_file_name, "wb"), np.array(topics))
-else:
-    topics = np.load(topic_file_name)
-
+## Test for input sentences
 stemmer = WordNetLemmatizer() 
 while True:
     sentence = input()
