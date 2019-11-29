@@ -12,3 +12,14 @@ def get_lexicon():
     return words
 
 
+def get_channels():
+    # Load channels
+    channels = {}
+    with open("docs.list", "rt") as doc_file:
+        for i, line in enumerate(doc_file.readlines()):
+            channel = line.split("\t")[-1].split("_")[0]
+            channels[i] = channel
+    print("Channels loaded")
+    return channels
+
+
