@@ -33,7 +33,9 @@ def gender_to_time(doc_id, gender_req):
            & (timeline[:, 1] <= gender_req["fsup"])
            & (timeline[:, 0] <= gender_req["msup"])
             & (timeline[:, 0] >= gender_req["minf"]))[:, 0])
-
+    
+    if not list_suitable_time:
+        return []
     intervals = []
     i = 0
     t1 = t = list_suitable_time[0]

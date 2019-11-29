@@ -21,7 +21,7 @@ from captions.util import PostingUtil
 from test_face_gender import gender_to_time
 DEFAULT_CONTEXT = 3
 
-gender_reqs = {"msup":20, "fsup":0, "finf":0, "minf":1}
+gender_reqs = {"msup":0, "fsup":20, "finf":1, "minf":0}
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -52,7 +52,7 @@ def main(index_dir, silent, context_size, folder, use_gender):
     stop_words = set(list(STOP_WORDS) + ["know", "don", "ve", "say", "way", "said", "ll", "think", "thing", "don’t", "like", "got", "people", "going", "talk", "right", "happened", ">>"])
     print("Stop words", stop_words)
     
-    doc_idxs = np.random.choice(246923, 2500)
+    doc_idxs = range(144, 246923)
     word_idx_dic = {}
     idx_counter = 0
 
