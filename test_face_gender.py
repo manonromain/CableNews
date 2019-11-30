@@ -10,26 +10,52 @@ def timeline_gender(doc_id):
     # Open json file
     file_name =os.path.join("face-bboxes", doc_id+".json") 
     if not os.path.exists(file_name):
-        print("Not found")
-        return np.zeros((0, 2))
+        #print("Not found")
+        return {}, {}, {}
     with open(file_name, "r") as json_file:
         data = json.load(json_file)
-
     if not data["faces"]:
-        return np.zeros((0, 2))
+        return {}, {}, {}
     
     tmin = int(min([d["t"][0] for d in data["faces"]]))
     tmax = int(np.ceil(max([d["t"][1] for d in data["faces"]])))
-    timeline = np.zeros((tmax, 2))
+    gender = {}
+    locations = {}
+    persons = {}
 
     # Create the timeline
+    #Create mapping:
+    person_mapping = {}
+    for name, idx in data["ids"]:
+        if idx in person_mapping.keys():
+            continue
+        person_mapping[idx] = name
+
     for d in data["faces"]:
         t1 = int(d['t'][0])
         t2 = int(d['t'][1])
-        id_g = 0 if d["g"]=="m" else 1
-        timeline[t1:t2, id_g] += 1
 
-    return timeline
+        for time_box in range(t1, t2):
+            if time_box in gender.keys():
+                gender[time_box].append(d['g'])
+            else:
+                gender[time_box] = [d['g']]
+
+        for time_box in range(t1, t2):
+            if time_box in locations.keys():
+                locations[time_box].append(d['b'])
+            else:
+                locations[time_box] = [d['b']]
+
+        for time_box in range(t1, t2):
+            if 'i' in d.keys():
+                if time_box in persons.keys():
+                    persons[time_box].append(person_mapping[d['i']])
+                else:
+                    persons[time_box] = [person_mapping[d['i']]]
+
+
+    return gender, locations, persons
 
 
 def gender_to_time(doc_id, gender_req):
@@ -39,7 +65,7 @@ def gender_to_time(doc_id, gender_req):
     # Open json file
     file_name =os.path.join("face-bboxes", doc_id+".json") 
     if not os.path.exists(file_name):
-        print("Not found")
+        #print("Not found")
         return []
     with open(file_name, "r") as json_file:
         data = json.load(json_file)

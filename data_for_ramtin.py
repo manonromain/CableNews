@@ -18,6 +18,8 @@ from captions import Lexicon, Documents, CaptionIndex
 from captions.query import Query
 from captions.util import PostingUtil
 
+import pickle
+
 from test_face_gender import timeline_gender
 DEFAULT_CONTEXT = 3
 
@@ -43,27 +45,36 @@ def gen(index_dir, silent, context_size):
     lex_path = os.path.join(index_dir, 'words.lex')
     idx_path = os.path.join(index_dir, 'index.bin')
 
+    channel = 'MSNBC'
+    var = {'CNN':(1, 82529), 'FOX': (82530, 162639), 'MSNBC': (162640, 246922)}
+    SIZE = 20000
+
     documents = Documents.load(doc_path)
     lexicon = Lexicon.load(lex_path)
 
     words = get_lexicon()
-    stop_words = set(list(STOP_WORDS) + ["know", "don", "ve", "say", "way", "said", "ll", "think", "thing", "don’t", "like", "got", "people", "going", "talk", "right", "happened", ">>"])
+    stop_words = set([">>"])
     print("Stop words", stop_words)
     
-    doc_idxs = range(10) #### TODO: pick a reasonable number before 250
+    start_idx, end_idx = var[channel] 
+    doc_idxs = list(np.random.choice(np.arange(start_idx, end_idx), SIZE))
 
     # Create stemmer
-    stemmer = WordNetLemmatizer() 
+    # stemmer = WordNetLemmatizer() 
    
-    results = []
     with CaptionIndex(idx_path, lexicon, documents) as index:
         for doc_id in tqdm.tqdm(doc_idxs):
+            results = {}
+
             count = 1
             
-            timeline = timeline_gender(str(doc_id))
-            print("timeline done")
-            if not timeline.shape[0]:
+            gender, locations, persons = timeline_gender(str(doc_id))
+            #print("meta data extracted")
+
+            if len(gender.keys()) == 0:
+                #print("Skipped id %d"%(doc_id))
                 continue
+
             postings = index.intervals(int(doc_id))
             
             sentence = ""
@@ -73,14 +84,39 @@ def gen(index_dir, silent, context_size):
                     starttime = p.start
 
                 # Cut after 30s
-                if p.end - starttime > 30*count:
+                if p.end - starttime > 3*count:
                     #import pdb; pdb.set_trace()
-                    if not (timeline[int(starttime):min(int(p.end), len(timeline))] == 0).all():
-                        results.append((sentence, 
-                            np.sum(timeline[int(starttime):min(int(p.end), len(timeline)), 0]), 
-                            np.sum(timeline[int(starttime):min(int(p.end), len(timeline)), 1]), 
-                            np.mean(timeline[int(starttime):min(int(p.end), len(timeline)), 0]), 
-                            np.mean(timeline[int(starttime):min(int(p.end), len(timeline)), 1]) ))
+                    t1 = int(starttime)
+                    t2 = int(p.end)
+                    for time_box in range(t1, t2):
+                        if time_box in gender.keys():
+                            frame_gender = gender[time_box]
+                        else:
+                            frame_gender = None
+
+                        if time_box in persons.keys():
+                            frame_persons = persons[time_box]
+                        else:
+                            frame_persons = None
+
+                        if time_box in locations.keys():
+                            frame_loc = locations[time_box]
+                        else:
+                            frame_loc = None
+
+                        if time_box in results.keys():
+                            results[time_box].append({'text': sentence, 'gender': frame_gender,
+                                                     'persons': frame_persons, 'locations': frame_loc})
+                        else:
+                            results[time_box] = [{'text': sentence, 'gender': frame_gender,
+                                                  'persons': frame_persons, 'locations': frame_loc}]
+
+                    # if not (timeline[int(starttime):min(int(p.end), len(timeline))] == 0).all():
+                    #     results.append((sentence, 
+                    #         np.sum(timeline[int(starttime):min(int(p.end), len(timeline)), 0]), 
+                    #         np.sum(timeline[int(starttime):min(int(p.end), len(timeline)), 1]), 
+                    #         np.mean(timeline[int(starttime):min(int(p.end), len(timeline)), 0]), 
+                    #         np.mean(timeline[int(starttime):min(int(p.end), len(timeline)), 1]) ))
                     count += 1
                     starttime = p.end
                     sentence = ""
@@ -92,10 +128,12 @@ def gen(index_dir, silent, context_size):
                 for token in tokens:
                     word = words[token]
                     # stemmed_word = stemmer.stem(word)
-                    if word not in stop_words and len(word)>1:
-                        stemmed_word = stemmer.lemmatize(word)
-                        sentence += stemmed_word + " " 
-    return results
+                    #if word not in stop_words and len(word)>1:
+                        #stemmed_word = stemmer.lemmatize(word)
+                    if word not in stop_words:
+                        sentence += word + " " 
+            pickle.dump(results, open('%s/meta_data_%d.p'%(channel, doc_id), 'wb'))
+    return None
 
 if __name__ == '__main__':
     gen(**vars(get_args()))
