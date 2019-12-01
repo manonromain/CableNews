@@ -1,7 +1,8 @@
 index.bin
 words.lex
 docs.list
-ECJ_doc*
+ECJ_*
 *.p
+*.out
 __pycache__
 nohup.out

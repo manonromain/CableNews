@@ -13,25 +13,27 @@ import nltk
 from nltk.stem.porter import PorterStemmer
 from nltk.stem import WordNetLemmatizer 
 
-from utils import get_lexicon
+from utils import get_lexicon, get_channels 
 from captions import Lexicon, Documents, CaptionIndex
 from captions.query import Query
 from captions.util import PostingUtil
 
+<<<<<<< HEAD
 import pickle
 
 from test_face_gender import timeline_gender
 DEFAULT_CONTEXT = 3
+=======
+from scan_face_gender import timeline_gender
+>>>>>>> 9a7c722128d8519466f85c982d72c976b504aaaa
 
-#gender_reqs = {"msup":0, "fsup":20, "finf":1, "minf":0}
+DEFAULT_CONTEXT = 30
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('index_dir', type=str,
                         help='Directory containing index files')
-    parser.add_argument('-s', dest='silent', action='store_true',
-                        help='Silent mode for benchmarking')
-    parser.add_argument('-c', dest='context_size', type=int,
+    parser.add_argument('-c', dest='window_size', type=int,
                         default=DEFAULT_CONTEXT,
                         help='Context window width (default: {})'.format(
                              DEFAULT_CONTEXT))
@@ -40,7 +42,18 @@ def get_args():
 
 
 
-def gen(index_dir, silent, context_size):
+def data_generator(index_dir, window_size, include_stop_words=False):
+    """Given a directory and a window size outputs a list of
+    (sentence, number of men on screen, 
+               number of women on screen,
+               mean number of men on screen, 
+               mean number of women on screen, 
+               channel)
+
+    sentence can be with or without stopwords
+    """
+
+    # Open the transcript files
     doc_path = os.path.join(index_dir, 'docs.list')
     lex_path = os.path.join(index_dir, 'words.lex')
     idx_path = os.path.join(index_dir, 'index.bin')
@@ -52,14 +65,25 @@ def gen(index_dir, silent, context_size):
     documents = Documents.load(doc_path)
     lexicon = Lexicon.load(lex_path)
 
+    # Getting words
     words = get_lexicon()
+<<<<<<< HEAD
     stop_words = set([">>"])
     print("Stop words", stop_words)
+=======
+
+    # Getting channels
+    docid_to_channels = get_channels()
+
+    # Selecting stop words
+    stop_words = set(list(STOP_WORDS) + ["know", "don", "ve", "say", "way", "said", "ll", "think", "thing", "don’t", "like", "got", "people", "going", "talk", "right", "happened", ">>"])
+>>>>>>> 9a7c722128d8519466f85c982d72c976b504aaaa
     
     start_idx, end_idx = var[channel] 
     doc_idxs = list(np.random.choice(np.arange(start_idx, end_idx), SIZE))
 
     # Create stemmer
+<<<<<<< HEAD
     # stemmer = WordNetLemmatizer() 
    
     with CaptionIndex(idx_path, lexicon, documents) as index:
@@ -75,6 +99,26 @@ def gen(index_dir, silent, context_size):
                 #print("Skipped id %d"%(doc_id))
                 continue
 
+=======
+    stemmer = WordNetLemmatizer() 
+
+    # Container for result tuples
+    results = []
+    with CaptionIndex(idx_path, lexicon, documents) as index:
+        for doc_id in tqdm.tqdm(doc_idxs):
+            ## Get channel
+            channel = docid_to_channels[doc_id]
+
+            count = 1
+            
+            # Loading the timeline of faces and their gender
+            timeline = timeline_gender(str(doc_id))
+            # If no faces in doc
+            if not timeline.shape[0]:
+                continue
+
+            # Get all the transcripts 
+>>>>>>> 9a7c722128d8519466f85c982d72c976b504aaaa
             postings = index.intervals(int(doc_id))
             
             sentence = ""
@@ -83,6 +127,7 @@ def gen(index_dir, silent, context_size):
                 if starttime is None:
                     starttime = p.start
 
+<<<<<<< HEAD
                 # Cut after 30s
                 if p.end - starttime > 3*count:
                     #import pdb; pdb.set_trace()
@@ -117,6 +162,22 @@ def gen(index_dir, silent, context_size):
                     #         np.sum(timeline[int(starttime):min(int(p.end), len(timeline)), 1]), 
                     #         np.mean(timeline[int(starttime):min(int(p.end), len(timeline)), 0]), 
                     #         np.mean(timeline[int(starttime):min(int(p.end), len(timeline)), 1]) ))
+=======
+                # Cut after windows_size s
+                if p.end - starttime > window_size*count:
+                    t1 = int(starttime)
+                    t2 = min(int(p.end), len(timeline))
+                    # Check if any faces appear in the timeframe
+                    if not (timeline[t1:t2] == 0).all():
+                        male_timeline = timeline[t1:t2, 0]
+                        female_timeline = timeline[t1:t2, 1]
+                        results.append((sentence, 
+                            np.sum(male_timeline),
+                            np.sum(female_timeline), 
+                            np.mean(male_timeline), 
+                            np.mean(female_timeline), channel))
+                    # Start a new sentence
+>>>>>>> 9a7c722128d8519466f85c982d72c976b504aaaa
                     count += 1
                     starttime = p.end
                     sentence = ""
@@ -126,7 +187,9 @@ def gen(index_dir, silent, context_size):
                 if not tokens:
                     continue
                 for token in tokens:
+                    # Getting corresponding word
                     word = words[token]
+<<<<<<< HEAD
                     # stemmed_word = stemmer.stem(word)
                     #if word not in stop_words and len(word)>1:
                         #stemmed_word = stemmer.lemmatize(word)
@@ -134,6 +197,20 @@ def gen(index_dir, silent, context_size):
                         sentence += word + " " 
             pickle.dump(results, open('%s/meta_data_%d.p'%(channel, doc_id), 'wb'))
     return None
+=======
+                    # Add word if we want all stopwords or if not a stopword 
+                    if include_stop_words or (word not in stop_words and len(word)>1):
+                        stemmed_word = stemmer.lemmatize(word)
+                        sentence += stemmed_word + " " 
+    return results
+>>>>>>> 9a7c722128d8519466f85c982d72c976b504aaaa
+
+
+## DEPRECATED
+def gen(index_dir, silent, windows_size):
+    return [x[0:5] for x in data_generator(index_dir, windows_size, False)]
 
 if __name__ == '__main__':
-    gen(**vars(get_args()))
+    args = get_args()
+    for x in data_generator(args.index_dir, args.window_size, True):
+        print(x)
